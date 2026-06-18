@@ -1,0 +1,126 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg-primary: #0A0E17;
+  --bg-card: #1A1F2E;
+  --bg-card-hover: #222840;
+  --border-color: #2D3548;
+  --text-primary: #E8ECF1;
+  --text-secondary: #8B95A8;
+  --accent: #00D4AA;
+  --accent-blue: #00B4D8;
+  --danger: #FF4D6A;
+  --success: #00D4AA;
+  --warning: #FFB020;
+
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(0, 212, 170, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(0, 212, 170, 0.8); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-blink {
+  animation: blink 1.5s ease-in-out infinite;
+}
+
+.stitch-btn {
+  background: linear-gradient(135deg, var(--accent), var(--accent-blue));
+  transition: all 0.3s ease;
+}
+
+.stitch-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 24px rgba(0, 212, 170, 0.4);
+}
+
+.stitch-btn:active {
+  transform: translateY(0);
+}
+
+.stitch-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.slice-item {
+  transition: all 0.15s ease;
+}
+
+.slice-item:hover {
+  background-color: var(--bg-card-hover);
+}
+
+.camera-panel {
+  transition: all 0.2s ease;
+  border: 1px solid var(--border-color);
+}
+
+.camera-panel:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 12px rgba(0, 212, 170, 0.1);
+}
+
+.progress-bar {
+  background: linear-gradient(90deg, var(--accent), var(--accent-blue));
+  transition: width 0.3s ease;
+}
+
+@keyframes slide-up {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+@keyframes scan-line {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+.scan-line::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: scan-line 3s linear infinite;
+}
