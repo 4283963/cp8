@@ -165,6 +165,53 @@ def _simulate_trim_and_concat(
     return True
 
 
+def _generate_placeholder_ffmpeg(output_file: Path, duration_ms: int, camera: str) -> bool:
+    try:
+        duration_sec = duration_ms / 1000.0
+        camera_label_map = {"front": "前", "rear": "后", "left": "左", "right": "右"}
+        label = f"{camera_label_map.get(camera, camera)}方摄像头暂无信号"
+
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "lavfi",
+            "-i", f"color=c=black:s=1280x720:d={duration_sec}:r=30",
+            "-vf", f"drawtext=text='{label}':fontcolor=red:fontsize=48:x=(w-text_w)/2:y=(h-text_h)/2",
+            "-f", "lavfi",
+            "-i", f"anullsrc=r=44100:cl=stereo:d={duration_sec}",
+            "-shortest",
+            "-c:v", "libx264",
+            "-c:a", "aac",
+            str(output_file),
+        ]
+        result = subprocess.run(cmd, capture_output=True, timeout=120)
+        return result.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+
+
+def _generate_placeholder_simulate(output_file: Path, duration_ms: int, camera: str) -> bool:
+    camera_label_map = {"front": "前", "rear": "后", "left": "左", "right": "右"}
+    label = f"{camera_label_map.get(camera, camera)}方摄像头暂无信号"
+
+    info_lines = [
+        f"=== 占位视频 (信号丢失) ===",
+        f"机位: {camera} ({label})",
+        f"总时长: {duration_ms} ms = {duration_ms/1000:.3f} s",
+        f"内容: 黑色背景 + 红色文字提示",
+        f"注意: 真实环境下将由 ffmpeg 生成实际视频",
+        "=== 结束 ===",
+    ]
+    output_file.write_text("\n".join(info_lines), encoding="utf-8")
+    return True
+
+
+def _generate_placeholder(output_file: Path, duration_ms: int, camera: str) -> bool:
+    if _has_ffmpeg():
+        if _generate_placeholder_ffmpeg(output_file, duration_ms, camera):
+            return True
+    return _generate_placeholder_simulate(output_file, duration_ms, camera)
+
+
 def _stitch_single_camera(
     camera: str,
     all_slices: Dict[str, List[Tuple[Path, int]]],
@@ -173,10 +220,20 @@ def _stitch_single_camera(
     output_dir: Path,
 ) -> Path:
     camera_slices = all_slices.get(camera, [])
-    selected = _select_slices_in_range(camera_slices, common_start, common_end)
+    total_duration = common_end - common_start
 
     now = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_file = output_dir / f"stitched_{camera}_{now}.mp4"
+
+    if not camera_slices:
+        _generate_placeholder(output_file, total_duration, camera)
+        return output_file
+
+    selected = _select_slices_in_range(camera_slices, common_start, common_end)
+
+    if not selected:
+        _generate_placeholder(output_file, total_duration, camera)
+        return output_file
 
     use_ffmpeg = _has_ffmpeg()
     if use_ffmpeg:
@@ -223,11 +280,14 @@ async def _run_stitch(task_id: str, cameras: List[str]) -> None:
             slices = get_slices_with_timestamps(camera)
             all_slices[camera] = slices
 
-        if not all_slices:
+        active_cameras = [c for c in cameras if all_slices.get(c)]
+        lost_cameras = [c for c in cameras if not all_slices.get(c)]
+
+        if not active_cameras:
             tasks[task_id] = StitchStatusResponse(
                 task_id=task_id,
                 status="failed",
-                message="未找到任何视频切片",
+                message="所有机位均无视频切片，无法拼接",
                 progress=0,
             )
             return
@@ -240,7 +300,8 @@ async def _run_stitch(task_id: str, cameras: List[str]) -> None:
         )
         await asyncio.sleep(0.1)
 
-        common_start, common_end = _find_common_time_range(all_slices)
+        active_slices = {c: all_slices[c] for c in active_cameras}
+        common_start, common_end = _find_common_time_range(active_slices)
         total_duration = common_end - common_start
 
         if total_duration <= 0:
@@ -256,10 +317,15 @@ async def _run_stitch(task_id: str, cameras: List[str]) -> None:
         output_files = []
 
         for idx, camera in enumerate(cameras):
+            if camera in lost_cameras:
+                msg = f"正在生成 {camera} 机位占位视频 (信号丢失)..."
+            else:
+                msg = f"正在拼接 {camera} 机位视频 (对齐中)..."
+
             tasks[task_id] = StitchStatusResponse(
                 task_id=task_id,
                 status="processing",
-                message=f"正在拼接 {camera} 机位视频 (对齐中)...",
+                message=msg,
                 progress=20 + int((idx / total) * 75),
             )
 
@@ -274,11 +340,16 @@ async def _run_stitch(task_id: str, cameras: List[str]) -> None:
             output_files.append(output_file)
             await asyncio.sleep(0.3)
 
+        lost_msg = ""
+        if lost_cameras:
+            lost_names = "、".join(lost_cameras)
+            lost_msg = f"，{lost_names} 机位信号丢失已用占位视频替代"
+
         tasks[task_id] = StitchStatusResponse(
             task_id=task_id,
             status="completed",
             output_file=f"stitched_all_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4",
-            message=f"全机位拼接完成，已按绝对时间戳对齐，共同时长 {total_duration/1000:.3f} 秒",
+            message=f"全机位拼接完成，已按绝对时间戳对齐，共同时长 {total_duration/1000:.3f} 秒{lost_msg}",
             progress=100,
         )
 

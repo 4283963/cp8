@@ -14,6 +14,10 @@ class VideoSummary(BaseModel):
     rear: int
     left: int
     right: int
+    front_status: Literal["ok", "lost"]
+    rear_status: Literal["ok", "lost"]
+    left_status: Literal["ok", "lost"]
+    right_status: Literal["ok", "lost"]
 
 
 class VideosResponse(BaseModel):

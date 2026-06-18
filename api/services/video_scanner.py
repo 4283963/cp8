@@ -39,13 +39,16 @@ def format_timestamp(ts_ms: int) -> str:
 
 def scan_video_slices() -> VideosResponse:
     slices: List[VideoSlice] = []
-    summary_dict: Dict[str, int] = {cam: 0 for cam in CAMERAS}
+    count_dict: Dict[str, int] = {cam: 0 for cam in CAMERAS}
+    status_dict: Dict[str, str] = {}
 
     for camera in CAMERAS:
         camera_dir = SLICES_DIR / camera
         if not camera_dir.exists():
+            status_dict[f"{camera}_status"] = "lost"
             continue
 
+        cam_slices = []
         for f in sorted(camera_dir.iterdir()):
             if not f.is_file() or not f.name.endswith(".mp4"):
                 continue
@@ -55,22 +58,25 @@ def scan_video_slices() -> VideosResponse:
                 continue
 
             cam_label, ts_ms = parsed
-
             size_kb = f.stat().st_size // 1024
 
-            slices.append(VideoSlice(
+            cam_slices.append(VideoSlice(
                 filename=f.name,
                 camera=cam_label,
                 timestamp=format_timestamp(ts_ms),
                 size_kb=size_kb,
             ))
-            summary_dict[camera] += 1
+
+        count_dict[camera] = len(cam_slices)
+        status_dict[f"{camera}_status"] = "ok" if cam_slices else "lost"
+        slices.extend(cam_slices)
 
     slices.sort(key=lambda s: s.timestamp, reverse=True)
 
+    summary_data = {**count_dict, **status_dict}
     return VideosResponse(
         slices=slices,
-        summary=VideoSummary(**summary_dict),
+        summary=VideoSummary(**summary_data),
     )
 
 

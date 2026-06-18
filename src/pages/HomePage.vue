@@ -3,7 +3,7 @@ import { onMounted, computed } from 'vue'
 import CameraPanel from '@/components/CameraPanel.vue'
 import { useVideos } from '@/composables/useVideos'
 import { useStitch } from '@/composables/useStitch'
-import type { CameraPosition } from '@/types'
+import type { CameraPosition, CameraStatus } from '@/types'
 
 const { data, loading, fetchVideos } = useVideos()
 const { stitching, status, error: stitchError, startStitch, reset } = useStitch()
@@ -23,7 +23,21 @@ const slicesByCamera = computed(() => {
   return grouped
 })
 
+const cameraStatuses = computed<Record<CameraPosition, CameraStatus>>(() => {
+  if (!data.value) return { front: 'ok', rear: 'ok', left: 'ok', right: 'ok' }
+  return {
+    front: data.value.summary.front_status,
+    rear: data.value.summary.rear_status,
+    left: data.value.summary.left_status,
+    right: data.value.summary.right_status,
+  }
+})
+
 const totalSlices = computed(() => data.value?.slices.length ?? 0)
+const activeCameraCount = computed(() => {
+  const statuses = cameraStatuses.value
+  return Object.values(statuses).filter(s => s === 'ok').length
+})
 
 const isCompleted = computed(() => status.value?.status === 'completed')
 const isFailed = computed(() => status.value?.status === 'failed')
@@ -74,6 +88,7 @@ onMounted(() => {
           :camera="camera"
           :slices="slicesByCamera[camera]"
           :loading="loading"
+          :status="cameraStatuses[camera]"
         />
       </div>
     </main>
@@ -128,7 +143,7 @@ onMounted(() => {
 
         <button
           @click="handleStitch"
-          :disabled="stitching || totalSlices === 0"
+          :disabled="stitching || activeCameraCount === 0"
           class="stitch-btn px-8 py-3 rounded-xl text-sm font-bold tracking-wide"
           style="color: var(--bg-primary);"
         >

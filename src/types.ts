@@ -7,11 +7,17 @@ export interface VideoSlice {
   size_kb: number
 }
 
+export type CameraStatus = 'ok' | 'lost'
+
 export interface VideoSummary {
   front: number
   rear: number
   left: number
   right: number
+  front_status: CameraStatus
+  rear_status: CameraStatus
+  left_status: CameraStatus
+  right_status: CameraStatus
 }
 
 export interface VideosResponse {
